@@ -4,29 +4,39 @@ import javax.servlet.annotation.WebServlet;
 
 import com.vaadin.annotations.Theme;
 import com.vaadin.annotations.VaadinServletConfiguration;
+import com.vaadin.server.FontAwesome;
 import com.vaadin.server.VaadinRequest;
 import com.vaadin.server.VaadinServlet;
-import com.vaadin.ui.Button;
-import com.vaadin.ui.Label;
-import com.vaadin.ui.TextField;
-import com.vaadin.ui.UI;
-import com.vaadin.ui.VerticalLayout;
+import com.vaadin.shared.ui.ValueChangeMode;
+import com.vaadin.ui.*;
+import com.vaadin.ui.themes.ValoTheme;
+
+import java.util.List;
 
 /**
- * This UI is the application entry point. A UI may either represent a browser window 
+ * This UI is the application entry point. A UI may either represent a browser window
  * (or tab) or some part of a html page where a Vaadin application is embedded.
  * <p>
- * The UI is initialized using {@link #init(VaadinRequest)}. This method is intended to be 
+ * The UI is initialized using {@link #init(VaadinRequest)}. This method is intended to be
  * overridden to add component to the user interface and initialize non-component functionality.
  */
 @Theme("mytheme")
 public class MyUI extends UI {
 
+    // Add the next two lines:
+    private CustomerService service = CustomerService.getInstance();
+    private Grid<Customer> grid = new Grid<>(Customer.class);
+    private TextField filterText = new TextField();
+    private CustomerForm form = new CustomerForm(this);
+
+
     @Override
     protected void init(VaadinRequest vaadinRequest) {
         final VerticalLayout layout = new VerticalLayout();
-        
-        final TextField name = new TextField();
+
+        // Simple add button and textfield for commit changes
+
+        /*final TextField name = new TextField();
         name.setCaption("Type your name here:");
 
         Button button = new Button("Click Me");
@@ -35,9 +45,59 @@ public class MyUI extends UI {
                     + ", it works!"));
         });
         
-        layout.addComponents(name, button);
-        
+        layout.addComponents(name, button);*/
+
+        Button addCustomerBtn = new Button("Add new customer");
+        addCustomerBtn.addClickListener(e -> {
+            grid.asSingleSelect().clear();
+            form.setCustomer(new Customer());
+        });
+
+        grid.setColumns("firstName", "lastName", "email");
+
+        // add Grid to the layout
+        layout.addComponent(grid);
+
+        updateList();
+
+        filterText.setPlaceholder("filter by name...");
+        filterText.addValueChangeListener(e -> updateList());
+        filterText.setValueChangeMode(ValueChangeMode.LAZY);
+
+        Button clearFilterTextBtn = new Button(FontAwesome.TIMES);
+        clearFilterTextBtn.setDescription("Clear the current filter");
+        clearFilterTextBtn.addClickListener(e -> filterText.clear());
+
+        CssLayout filtering = new CssLayout();
+        filtering.addComponents(filterText, clearFilterTextBtn);
+        filtering.setStyleName(ValoTheme.LAYOUT_COMPONENT_GROUP);
+
+        HorizontalLayout toolbar = new HorizontalLayout(filtering, addCustomerBtn);
+
+        HorizontalLayout main = new HorizontalLayout(grid, form);
+        main.setSizeFull();
+        grid.setSizeFull();
+        main.setExpandRatio(grid, 1);
+
+        layout.addComponents(toolbar, main);
+
         setContent(layout);
+
+        form.setVisible(false);
+
+        grid.asSingleSelect().addValueChangeListener(event -> {
+            if (event.getValue() == null) {
+                form.setVisible(false);
+            } else {
+                form.setCustomer(event.getValue());
+            }
+        });
+    }
+
+    public void updateList() {
+        // fetch list of Customers from service and assign it to Grid
+        List<Customer> customers = service.findAll(filterText.getValue());
+        grid.setItems(customers);
     }
 
     @WebServlet(urlPatterns = "/*", name = "MyUIServlet", asyncSupported = true)
